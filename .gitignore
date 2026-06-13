@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.photo_sorter_state.json
+photo_sort_results.csv
+photo_sort_results.json
+.DS_Store
