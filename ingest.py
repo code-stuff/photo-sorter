@@ -256,10 +256,10 @@ def main() -> None:
 
         # Show LAN IP so users can open on phone
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            lan_ip = s.getsockname()[0]
-            s.close()
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.connect(("8.8.8.8", 80))
+            lan_ip = sock.getsockname()[0]
+            sock.close()
         except Exception:
             lan_ip = "localhost"
 

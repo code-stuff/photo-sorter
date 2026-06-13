@@ -370,7 +370,11 @@ function buildButtons() {
   cats.forEach((cat, i) => {
     const btn = document.createElement("button");
     btn.className = "cat-btn";
-    btn.innerHTML = `${cat}<span class="key-hint">[${i + 1}]</span>`;
+    btn.textContent = cat;
+    const hint = document.createElement("span");
+    hint.className = "key-hint";
+    hint.textContent = `[${i + 1}]`;
+    btn.appendChild(hint);
     btn.addEventListener("click", () => decide(cat));
     btn.addEventListener("touchstart", () => {}, { passive: true }); // prevent delay
     row.appendChild(btn);
@@ -386,8 +390,7 @@ function showCurrent() {
   document.getElementById("progress-lbl").textContent = `${decided}/${images.length}`;
 
   // Filename
-  const displayName = img.key.includes("/") ? img.key : img.key;
-  document.getElementById("filename-lbl").textContent = displayName;
+  document.getElementById("filename-lbl").textContent = img.key;
 
   // Photo — resolve relative path if served from same origin
   const photo = document.getElementById("photo");
