@@ -68,10 +68,10 @@ def export_results(folder: Path, images: list[Path], decisions: dict) -> None:
 
     rows = []
     for img in images:
-        name = img.name
-        category = decisions.get(name)
+        key = str(img.relative_to(folder))
+        category = decisions.get(key)
         if category is not None:
-            rows.append({"filename": name, "category": category})
+            rows.append({"filename": key, "category": category})
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["filename", "category"])
@@ -100,7 +100,7 @@ class PhotoSorter:
         # Find first undecided photo index
         self.index = 0
         for i, img in enumerate(self.images):
-            if img.name not in self.decisions:
+            if str(img.relative_to(self.folder)) not in self.decisions:
                 self.index = i
                 break
         else:
@@ -163,10 +163,8 @@ class PhotoSorter:
         return "   ".join(parts)
 
     def _bind_keys(self) -> None:
-        self.root.bind("<Key-1>", lambda e: self._decide(self.categories[0]))
-        self.root.bind("<Key-2>", lambda e: self._decide(self.categories[1]) if len(self.categories) > 1 else None)
-        self.root.bind("<Key-3>", lambda e: self._decide(self.categories[2]) if len(self.categories) > 2 else None)
-        self.root.bind("<Key-4>", lambda e: self._decide(self.categories[3]) if len(self.categories) > 3 else None)
+        for i, cat in enumerate(self.categories, 1):
+            self.root.bind(f"<Key-{i}>", lambda e, c=cat: self._decide(c))
         self.root.bind("<Key-r>", lambda e: self._decide("rejected"))
         self.root.bind("<Key-R>", lambda e: self._decide("rejected"))
         self.root.bind("<Left>", lambda e: self._go_back())
@@ -178,11 +176,12 @@ class PhotoSorter:
             return
 
         img_path = self.images[self.index]
-        decided = sum(1 for img in self.images if img.name in self.decisions)
+        img_key = str(img_path.relative_to(self.folder))
+        decided = sum(1 for img in self.images if str(img.relative_to(self.folder)) in self.decisions)
         self.progress_label.config(text=f"{decided}/{len(self.images)} sorted")
-        self.filename_label.config(text=img_path.name)
+        self.filename_label.config(text=img_key)
 
-        current_decision = self.decisions.get(img_path.name)
+        current_decision = self.decisions.get(img_key)
         if current_decision:
             self.decision_label.config(text=f"Tagged: {current_decision}")
         else:
@@ -223,12 +222,13 @@ class PhotoSorter:
 
     def _decide(self, category: str) -> None:
         img = self.images[self.index]
-        self.decisions[img.name] = category
+        img_key = str(img.relative_to(self.folder))
+        self.decisions[img_key] = category
         self.state["decisions"] = self.decisions
         save_state(self.folder, self.state)
         export_results(self.folder, self.images, self.decisions)
 
-        decided = sum(1 for i in self.images if i.name in self.decisions)
+        decided = sum(1 for i in self.images if str(i.relative_to(self.folder)) in self.decisions)
         if decided == len(self.images):
             messagebox.showinfo("All done!", f"All {len(self.images)} photos sorted!\nResults saved to photo_sort_results.csv and .json")
             self.root.destroy()
@@ -236,7 +236,7 @@ class PhotoSorter:
 
         # Advance to next undecided
         next_idx = self.index + 1
-        while next_idx < len(self.images) and self.images[next_idx].name in self.decisions:
+        while next_idx < len(self.images) and str(self.images[next_idx].relative_to(self.folder)) in self.decisions:
             next_idx += 1
         if next_idx >= len(self.images):
             next_idx = self.index  # stay at last photo
