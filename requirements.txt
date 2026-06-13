@@ -1,1 +1,7 @@
 pillow>=10.0.0
+
+# Optional — for RAW camera files (ARW/CR2/CR3/NEF/DNG/etc.)
+# rawpy>=0.18.0
+
+# Optional — for HEIC/HEIF files
+# pillow-heif>=0.13.0
