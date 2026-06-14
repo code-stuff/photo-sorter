@@ -1,0 +1,60 @@
+{
+  "source": "demo_images",
+  "categories": [
+    "Common",
+    "Groom side",
+    "Bride side"
+  ],
+  "images": [
+    {
+      "key": "photo_001.jpg",
+      "thumb": "demo_images/photo_001.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_002.jpg",
+      "thumb": "demo_images/photo_002.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_003.jpg",
+      "thumb": "demo_images/photo_003.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_004.jpg",
+      "thumb": "demo_images/photo_004.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_005.jpg",
+      "thumb": "demo_images/photo_005.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_006.jpg",
+      "thumb": "demo_images/photo_006.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_007.jpg",
+      "thumb": "demo_images/photo_007.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_008.jpg",
+      "thumb": "demo_images/photo_008.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_009.jpg",
+      "thumb": "demo_images/photo_009.jpg",
+      "folder": ""
+    },
+    {
+      "key": "photo_010.jpg",
+      "thumb": "demo_images/photo_010.jpg",
+      "folder": ""
+    }
+  ]
+}

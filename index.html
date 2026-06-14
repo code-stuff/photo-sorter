@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Photo Sorter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #111;
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* ── Layout shells ── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1a1a1a;
+  font-size: 13px;
+  color: #aaa;
+  gap: 8px;
+}
+#topbar .filename { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55vw; }
+#topbar .progress { white-space: nowrap; flex-shrink: 0; }
+#topbar .back-btn {
+  background: none; border: 1px solid #444; color: #ccc; border-radius: 6px;
+  padding: 4px 10px; font-size: 13px; cursor: pointer; flex-shrink: 0;
+}
+#topbar .back-btn:active { background: #333; }
+
+#imgwrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+#photo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+/* Swipe hint overlay */
+#swipe-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.55);
+  color: #bbb;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+#swipe-hint.show { opacity: 1; }
+
+/* Decision flash */
+#decision-flash {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,180,80,0.85);
+  color: #fff;
+  font-size: 22px;
+  font-weight: bold;
+  padding: 14px 28px;
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+#decision-flash.show { opacity: 1; }
+#decision-flash.reject { background: rgba(200,40,40,0.85); }
+
+/* Category buttons */
+#buttons {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: #1a1a1a;
+}
+
+.cat-row { display: flex; gap: 8px; }
+
+.cat-btn {
+  flex: 1;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  color: #ddd;
+  border-radius: 10px;
+  padding: 13px 6px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-btn:active { background: #3a3a3a; transform: scale(0.97); }
+.cat-btn .key-hint { font-size: 10px; color: #666; display: block; margin-top: 2px; }
+
+.reject-btn {
+  background: #1e1010;
+  border-color: #553333;
+  color: #cc6666;
+}
+.reject-btn:active { background: #2a1515; }
+
+/* Export row */
+#export-row {
+  display: flex; gap: 8px; margin-top: 2px;
+}
+.export-btn {
+  flex: 1;
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.export-btn:active { background: #222; }
+
+/* ── Screens ── */
+#load-screen, #done-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+}
+#load-screen h1, #done-screen h2 { font-size: 22px; color: #eee; }
+#load-screen p, #done-screen p { color: #888; font-size: 14px; max-width: 320px; }
+.primary-btn {
+  background: #2255cc;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 28px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+.primary-btn:active { background: #1a44aa; }
+.secondary-btn {
+  background: none;
+  color: #888;
+  border: 1px solid #444;
+  border-radius: 10px;
+  padding: 10px 22px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.secondary-btn:active { background: #222; }
+
+#cat-config { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 320px; }
+#cat-config label { font-size: 13px; color: #888; }
+#cat-config input {
+  background: #222; border: 1px solid #444; color: #eee;
+  border-radius: 8px; padding: 10px 12px; font-size: 15px; width: 100%;
+}
+</style>
+</head>
+<body>
+
+<!-- ─────────── LOAD SCREEN ─────────── -->
+<div id="load-screen">
+  <h1>📷 Photo Sorter</h1>
+  <p>Load <code>manifest.json</code> from an ingest run, or configure categories below.</p>
+
+  <div id="cat-config">
+    <label>Categories (comma-separated)</label>
+    <input id="cat-input" type="text" value="Common,Groom side,Bride side">
+  </div>
+
+  <button class="primary-btn" id="load-manifest-btn">Load manifest.json</button>
+  <button class="secondary-btn" id="resume-btn" style="display:none">Resume last session</button>
+  <p id="load-error" style="color:#cc5555; font-size:13px;"></p>
+</div>
+
+<!-- ─────────── SORTER (hidden until loaded) ─────────── -->
+<div id="app" style="display:none">
+  <div id="topbar">
+    <button class="back-btn" id="back-btn">← Back</button>
+    <span class="filename" id="filename-lbl"></span>
+    <span class="progress" id="progress-lbl"></span>
+  </div>
+
+  <div id="imgwrap">
+    <img id="photo" alt="">
+    <div id="swipe-hint"></div>
+    <div id="decision-flash"></div>
+  </div>
+
+  <div id="buttons">
+    <div class="cat-row" id="cat-row"></div>
+    <div class="cat-row">
+      <button class="cat-btn reject-btn" id="reject-btn">
+        Reject / Skip
+        <span class="key-hint">[R]</span>
+      </button>
+    </div>
+    <div id="export-row">
+      <button class="export-btn" id="export-csv-btn">Export CSV</button>
+      <button class="export-btn" id="export-json-btn">Export JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── DONE SCREEN ─────────── -->
+<div id="done-screen" style="display:none">
+  <h2>All done! 🎉</h2>
+  <p id="done-msg"></p>
+  <button class="primary-btn" id="done-export-csv">Download CSV</button>
+  <button class="primary-btn" id="done-export-json">Download JSON</button>
+  <button class="secondary-btn" id="done-restart">Sort again from beginning</button>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════
+let manifest = null;   // { source, categories, images: [{key, thumb, folder}] }
+let images   = [];     // manifest.images
+let cats     = [];     // category names
+let decisions = {};    // key → category
+let index    = 0;      // current image index
+const STORAGE_KEY = "photo_sorter_v1";
+
+// ── Persist ──────────────────────────────────────────────
+function saveSession() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ decisions, index, cats, source: manifest?.source }));
+  } catch(e) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+function clearSession() {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+// ══════════════════════════════════════════════════════════
+// Boot
+// ══════════════════════════════════════════════════════════
+(function boot() {
+  const session = loadSession();
+  if (session?.decisions && Object.keys(session.decisions).length > 0) {
+    document.getElementById("resume-btn").style.display = "";
+    document.getElementById("resume-btn").textContent =
+      `Resume (${Object.keys(session.decisions).length} decisions saved)`;
+  }
+
+  // If served alongside manifest.json, auto-fetch
+  if (location.protocol !== "file:") {
+    fetch("manifest.json")
+      .then(r => r.ok ? r.json() : null)
+      .then(m => { if (m) startFromManifest(m); })
+      .catch(() => {});
+  }
+})();
+
+// ══════════════════════════════════════════════════════════
+// Load screen handlers
+// ══════════════════════════════════════════════════════════
+document.getElementById("load-manifest-btn").addEventListener("click", () => {
+  const input = Object.assign(document.createElement("input"), { type: "file", accept: ".json" });
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const m = JSON.parse(ev.target.result);
+        startFromManifest(m);
+      } catch(ex) {
+        document.getElementById("load-error").textContent = "Invalid manifest.json: " + ex.message;
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+});
+
+document.getElementById("resume-btn").addEventListener("click", () => {
+  // Re-fetch manifest or prompt
+  const session = loadSession();
+  if (!session) return;
+  // Try auto-fetch first
+  if (location.protocol !== "file:") {
+    fetch("manifest.json")
+      .then(r => r.ok ? r.json() : null)
+      .then(m => {
+        if (m) startFromManifest(m, session);
+        else document.getElementById("load-manifest-btn").click();
+      })
+      .catch(() => document.getElementById("load-manifest-btn").click());
+  } else {
+    document.getElementById("load-manifest-btn").click();
+  }
+});
+
+function startFromManifest(m, resumeSession) {
+  manifest  = m;
+  images    = m.images || [];
+  cats      = m.categories?.length ? m.categories : parseCatInput();
+
+  const session = resumeSession || loadSession();
+  if (session?.decisions && session.source === m.source) {
+    decisions = session.decisions;
+  } else {
+    decisions = {};
+  }
+
+  // Find first undecided
+  index = images.findIndex(img => !decisions[img.key]);
+  if (index < 0) index = images.length - 1;
+
+  buildButtons();
+  showSorter();
+  showCurrent();
+}
+
+function parseCatInput() {
+  return document.getElementById("cat-input").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+}
+
+// ══════════════════════════════════════════════════════════
+// Sorter UI
+// ══════════════════════════════════════════════════════════
+function showSorter() {
+  document.getElementById("load-screen").style.display = "none";
+  document.getElementById("done-screen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+}
+
+function buildButtons() {
+  const row = document.getElementById("cat-row");
+  row.innerHTML = "";
+  cats.forEach((cat, i) => {
+    const btn = document.createElement("button");
+    btn.className = "cat-btn";
+    btn.textContent = cat;
+    const hint = document.createElement("span");
+    hint.className = "key-hint";
+    hint.textContent = `[${i + 1}]`;
+    btn.appendChild(hint);
+    btn.addEventListener("click", () => decide(cat));
+    btn.addEventListener("touchstart", () => {}, { passive: true }); // prevent delay
+    row.appendChild(btn);
+  });
+}
+
+function showCurrent() {
+  if (!images.length) return;
+  const img = images[index];
+
+  // Progress
+  const decided = Object.keys(decisions).length;
+  document.getElementById("progress-lbl").textContent = `${decided}/${images.length}`;
+
+  // Filename
+  document.getElementById("filename-lbl").textContent = img.key;
+
+  // Photo — resolve relative path if served from same origin
+  const photo = document.getElementById("photo");
+  photo.src = img.thumb;
+  photo.alt = img.key;
+
+  // Show swipe hint for ≤3 categories (first 3 loads only)
+  if (cats.length <= 3) {
+    const hint = document.getElementById("swipe-hint");
+    hint.textContent = "← swipe right → or tap buttons";
+    hint.classList.add("show");
+    clearTimeout(hint._timer);
+    hint._timer = setTimeout(() => hint.classList.remove("show"), 2500);
+  }
+}
+
+function decide(category) {
+  const img = images[index];
+  decisions[img.key] = category;
+  saveSession();
+
+  // Flash
+  const flash = document.getElementById("decision-flash");
+  flash.textContent = category === "rejected" ? "✗  Rejected" : "✓  " + category;
+  flash.className = "show" + (category === "rejected" ? " reject" : "");
+  clearTimeout(flash._timer);
+  flash._timer = setTimeout(() => flash.className = "", 600);
+
+  // Check all decided
+  const decided = Object.keys(decisions).length;
+  if (decided >= images.length) {
+    showDoneScreen();
+    return;
+  }
+
+  // Advance to next undecided
+  let next = index + 1;
+  while (next < images.length && decisions[images[next].key]) next++;
+  if (next >= images.length) {
+    // Wrap — find any undecided
+    next = images.findIndex(img => !decisions[img.key]);
+    if (next < 0) { showDoneScreen(); return; }
+  }
+  index = next;
+  showCurrent();
+}
+
+document.getElementById("back-btn").addEventListener("click", () => {
+  if (index > 0) { index--; showCurrent(); }
+});
+document.getElementById("reject-btn").addEventListener("click", () => decide("rejected"));
+document.getElementById("export-csv-btn").addEventListener("click", () => downloadCSV());
+document.getElementById("export-json-btn").addEventListener("click", () => downloadJSON());
+
+// ══════════════════════════════════════════════════════════
+// Keyboard
+// ══════════════════════════════════════════════════════════
+document.addEventListener("keydown", e => {
+  if (!images.length) return;
+  const n = parseInt(e.key, 10);
+  if (!isNaN(n) && n >= 1 && n <= cats.length) { decide(cats[n - 1]); return; }
+  if (e.key === "r" || e.key === "R") { decide("rejected"); return; }
+  if (e.key === "ArrowLeft" || e.key === "Backspace") {
+    if (index > 0) { index--; showCurrent(); }
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// Touch / Swipe (≤3 categories: left/right swipe)
+// ══════════════════════════════════════════════════════════
+(function initSwipe() {
+  let startX = 0, startY = 0, startTime = 0;
+  const wrap = document.getElementById("imgwrap");
+
+  wrap.addEventListener("touchstart", e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, { passive: true });
+
+  wrap.addEventListener("touchend", e => {
+    if (!images.length || cats.length > 3) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    const dt = Date.now() - startTime;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 600) return;
+
+    if (dx < 0 && cats.length >= 1) decide(cats[0]);       // swipe left → cat 1
+    else if (dx > 0 && cats.length >= 2) decide(cats[1]);  // swipe right → cat 2
+  }, { passive: true });
+})();
+
+// ══════════════════════════════════════════════════════════
+// Export helpers
+// ══════════════════════════════════════════════════════════
+function buildRows() {
+  // Group by folder
+  const byFolder = {};
+  for (const img of images) {
+    const cat = decisions[img.key];
+    if (!cat) continue;
+    const folder = img.folder || "";
+    if (!byFolder[folder]) byFolder[folder] = [];
+    byFolder[folder].push({ filename: img.key, folder, category: cat });
+  }
+  // Flatten in folder order
+  const rows = [];
+  const folders = Object.keys(byFolder).sort();
+  for (const f of folders) rows.push(...byFolder[f]);
+  return rows;
+}
+
+function downloadCSV() {
+  const rows = buildRows();
+  const header = "filename,folder,category\n";
+  const body = rows.map(r => `${csvEsc(r.filename)},${csvEsc(r.folder)},${csvEsc(r.category)}`).join("\n");
+  download("photo_sort_results.csv", "text/csv", header + body);
+}
+
+function downloadJSON() {
+  const rows = buildRows();
+  download("photo_sort_results.json", "application/json", JSON.stringify(rows, null, 2));
+}
+
+function csvEsc(v) {
+  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+function download(name, type, content) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ══════════════════════════════════════════════════════════
+// Done screen
+// ══════════════════════════════════════════════════════════
+function showDoneScreen() {
+  document.getElementById("app").style.display = "none";
+  document.getElementById("done-screen").style.display = "flex";
+  document.getElementById("done-msg").textContent =
+    `All ${images.length} photos sorted! Download your results:`;
+}
+
+document.getElementById("done-export-csv").addEventListener("click", downloadCSV);
+document.getElementById("done-export-json").addEventListener("click", downloadJSON);
+document.getElementById("done-restart").addEventListener("click", () => {
+  decisions = {};
+  clearSession();
+  index = 0;
+  showSorter();
+  showCurrent();
+});
+</script>
+</body>
+</html>
