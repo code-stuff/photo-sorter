@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Photo Sorter</title>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js" crossorigin="anonymous"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -154,6 +155,8 @@ html, body {
   gap: 18px;
   padding: 24px;
   text-align: center;
+  overflow-y: auto;
+  touch-action: auto;
 }
 #load-screen h1, #done-screen h2 { font-size: 22px; color: #eee; }
 #load-screen p, #done-screen p { color: #888; font-size: 14px; max-width: 320px; }
@@ -166,6 +169,8 @@ html, body {
   font-size: 16px;
   cursor: pointer;
   margin-top: 6px;
+  width: 100%;
+  max-width: 320px;
 }
 .primary-btn:active { background: #1a44aa; }
 .secondary-btn {
@@ -176,6 +181,8 @@ html, body {
   padding: 10px 22px;
   font-size: 14px;
   cursor: pointer;
+  width: 100%;
+  max-width: 320px;
 }
 .secondary-btn:active { background: #222; }
 
@@ -185,14 +192,139 @@ html, body {
   background: #222; border: 1px solid #444; color: #eee;
   border-radius: 8px; padding: 10px 12px; font-size: 15px; width: 100%;
 }
+
+/* ── Divider ── */
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  color: #555; font-size: 12px;
+  width: 100%; max-width: 320px;
+}
+.divider::before, .divider::after {
+  content: ''; flex: 1; height: 1px; background: #333;
+}
+
+/* ── SharePoint panel ── */
+#sp-section {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+#sp-section label {
+  font-size: 13px;
+  color: #888;
+  display: block;
+  margin-bottom: 4px;
+}
+
+#sp-section input[type="text"],
+#sp-section input[type="url"],
+#sp-section input[type="password"] {
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 100%;
+}
+#sp-section input:focus { outline: none; border-color: #2255cc; }
+
+#sp-signin-btn {
+  background: #0078d4;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-size: 15px;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+#sp-signin-btn:active { background: #006bb8; }
+#sp-signin-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+
+.ms-logo {
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 23 23'%3E%3Crect x='1' y='1' width='10' height='10' fill='%23f25022'/%3E%3Crect x='12' y='1' width='10' height='10' fill='%237fba00'/%3E%3Crect x='1' y='12' width='10' height='10' fill='%2300a4ef'/%3E%3Crect x='12' y='12' width='10' height='10' fill='%23ffb900'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+#sp-status {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  min-height: 20px;
+}
+#sp-status.error { color: #cc5555; }
+#sp-status.ok { color: #55cc88; }
+
+/* Collapsible credentials section */
+.collapsible-header {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.collapsible-header::before {
+  content: '▶';
+  font-size: 9px;
+  transition: transform 0.2s;
+}
+.collapsible-header.open::before { transform: rotate(90deg); }
+
+.collapsible-body { display: none; flex-direction: column; gap: 8px; }
+.collapsible-body.open { display: flex; }
+
+/* Loading overlay */
+#loading-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 100;
+}
+#loading-overlay.show { display: flex; }
+#loading-overlay p { color: #ccc; font-size: 15px; }
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid #333;
+  border-top-color: #2255cc;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-detail { font-size: 12px; color: #666; max-width: 280px; text-align: center; }
 </style>
 </head>
 <body>
 
+<!-- ─────────── LOADING OVERLAY ─────────── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <p id="loading-msg">Loading photos…</p>
+  <span id="loading-detail"></span>
+</div>
+
 <!-- ─────────── LOAD SCREEN ─────────── -->
 <div id="load-screen">
   <h1>📷 Photo Sorter</h1>
-  <p>Load <code>manifest.json</code> from an ingest run, or configure categories below.</p>
+  <p>Load <code>manifest.json</code> from an ingest run, or connect directly to a SharePoint folder.</p>
 
   <div id="cat-config">
     <label>Categories (comma-separated)</label>
@@ -201,6 +333,38 @@ html, body {
 
   <button class="primary-btn" id="load-manifest-btn">Load manifest.json</button>
   <button class="secondary-btn" id="resume-btn" style="display:none">Resume last session</button>
+
+  <div class="divider">or</div>
+
+  <!-- SharePoint connect section -->
+  <div id="sp-section">
+    <div>
+      <label for="sp-url-input">SharePoint folder URL</label>
+      <input type="url" id="sp-url-input" placeholder="https://tenant.sharepoint.com/sites/…">
+    </div>
+
+    <button class="collapsible-header" id="creds-toggle">Azure AD credentials (required once)</button>
+    <div class="collapsible-body" id="creds-body">
+      <div>
+        <label for="sp-client-id">Application (client) ID</label>
+        <input type="text" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+      </div>
+      <div>
+        <label for="sp-tenant-id">Directory (tenant) ID</label>
+        <input type="text" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+      </div>
+      <p style="font-size:11px; color:#555; line-height:1.5;">
+        Register a SPA app in Azure Portal → Microsoft Entra ID. Add redirect URI: <code id="redirect-uri-hint" style="color:#888"></code>. Grant <code style="color:#888">Files.Read.All</code> permission. IDs are not secrets.
+      </p>
+    </div>
+
+    <button id="sp-signin-btn">
+      <span class="ms-logo"></span>
+      Sign in with Microsoft
+    </button>
+    <div id="sp-status"></div>
+  </div>
+
   <p id="load-error" style="color:#cc5555; font-size:13px;"></p>
 </div>
 
@@ -246,12 +410,14 @@ html, body {
 // ══════════════════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════════════════
-let manifest = null;   // { source, categories, images: [{key, thumb, folder}] }
-let images   = [];     // manifest.images
-let cats     = [];     // category names
-let decisions = {};    // key → category
-let index    = 0;      // current image index
-const STORAGE_KEY = "photo_sorter_v1";
+let manifest  = null;   // { source, categories, images: [{key, thumb, folder}] }
+let images    = [];     // manifest.images
+let cats      = [];     // category names
+let decisions = {};     // key → category
+let index     = 0;      // current image index
+const STORAGE_KEY    = "photo_sorter_v1";
+const SP_CONFIG_KEY  = "photo_sorter_sp_config";
+const SP_PENDING_KEY = "photo_sorter_sp_pending";
 
 // ── Persist ──────────────────────────────────────────────
 function saveSession() {
@@ -270,9 +436,289 @@ function clearSession() {
 }
 
 // ══════════════════════════════════════════════════════════
+// SharePoint / MSAL helpers
+// ══════════════════════════════════════════════════════════
+function loadSpConfig() {
+  try { return JSON.parse(localStorage.getItem(SP_CONFIG_KEY) || "{}"); } catch { return {}; }
+}
+function saveSpConfig(clientId, tenantId) {
+  localStorage.setItem(SP_CONFIG_KEY, JSON.stringify({ clientId, tenantId }));
+}
+
+function setSpStatus(msg, cls) {
+  const el = document.getElementById("sp-status");
+  el.textContent = msg;
+  el.className = cls || "";
+}
+
+function setLoading(show, msg, detail) {
+  const overlay = document.getElementById("loading-overlay");
+  overlay.className = show ? "show" : "";
+  if (msg) document.getElementById("loading-msg").textContent = msg;
+  if (detail !== undefined) document.getElementById("loading-detail").textContent = detail || "";
+}
+
+function placeholderThumb(name) {
+  const safe = name.replace(/</g, "&lt;");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="#2a2a2a"/><text x="160" y="120" text-anchor="middle" dominant-baseline="middle" fill="#666" font-family="monospace" font-size="13">${safe}</text></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}
+
+async function createMsalInstance(clientId, tenantId) {
+  const redirectUri = location.origin + location.pathname;
+  const instance = new msal.PublicClientApplication({
+    auth: {
+      clientId,
+      authority: "https://login.microsoftonline.com/" + tenantId,
+      redirectUri,
+    },
+    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: false },
+  });
+  if (typeof instance.initialize === "function") await instance.initialize();
+  return instance;
+}
+
+async function getAccessToken(msalInstance) {
+  const scopes = ["https://graph.microsoft.com/Files.Read.All", "https://graph.microsoft.com/User.Read"];
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const r = await msalInstance.acquireTokenSilent({ scopes, account: accounts[0] });
+      return r.accessToken;
+    } catch(e) {
+      // Silent failed — fall through to interactive
+    }
+  }
+  return null; // caller should trigger loginRedirect
+}
+
+// Resolve a SharePoint folder URL to { driveId, itemId } via Graph
+async function resolveSpFolder(token, folderUrl) {
+  const h = { Authorization: "Bearer " + token, Accept: "application/json" };
+  const G = "https://graph.microsoft.com/v1.0";
+
+  // Share link (contains /:f:/ or /r/ shortlinks)
+  if (/\/:f:\//i.test(folderUrl) || /\/r\//i.test(folderUrl)) {
+    const b64 = btoa(unescape(encodeURIComponent(folderUrl))).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const shareId = "u!" + b64;
+    const resp = await fetch(`${G}/shares/${shareId}/driveItem`, { headers: h });
+    if (!resp.ok) throw new Error("Cannot resolve share link (" + resp.status + "). Make sure it is an 'Anyone with the link' share.");
+    const item = await resp.json();
+    return { driveId: item.parentReference.driveId, itemId: item.id };
+  }
+
+  // Direct URL: extract site + folder path
+  const url = new URL(folderUrl);
+  const hostname = url.hostname;
+  const parts = url.pathname.split("/").filter(Boolean);
+
+  // Find "sites" or "teams" segment to identify the site
+  const siteKeyword = ["sites", "teams"].find(k => parts.includes(k));
+  if (!siteKeyword) throw new Error("Cannot find a 'sites' or 'teams' segment in the URL. Try pasting a direct folder link from SharePoint.");
+
+  const kwIdx = parts.indexOf(siteKeyword);
+  const siteName = parts[kwIdx + 1];
+  const sitePath = "/" + siteKeyword + "/" + siteName;
+
+  // Get site ID
+  const siteResp = await fetch(`${G}/sites/${hostname}:${sitePath}`, { headers: h });
+  if (!siteResp.ok) throw new Error("Cannot access site (" + siteResp.status + "). Check permissions.");
+  const site = await siteResp.json();
+
+  // Remaining path after the site: [library, ...folderParts]
+  const afterSite = parts.slice(kwIdx + 2);
+  const librarySegment = afterSite[0]; // e.g. "Shared%20Documents"
+  const folderParts = afterSite.slice(1); // subfolder path
+
+  // Get the matching drive (document library)
+  const drivesResp = await fetch(`${G}/sites/${site.id}/drives`, { headers: h });
+  if (!drivesResp.ok) throw new Error("Cannot list document libraries (" + drivesResp.status + ").");
+  const drives = (await drivesResp.json()).value;
+
+  const libName = librarySegment ? decodeURIComponent(librarySegment) : "Documents";
+  const drive = drives.find(d =>
+    d.name === libName ||
+    d.webUrl.endsWith("/" + librarySegment)
+  ) || drives[0];
+
+  if (!drive) throw new Error("No document library found in this site.");
+
+  if (folderParts.length === 0) {
+    return { driveId: drive.id, itemId: "root" };
+  }
+
+  const folderPath = folderParts.map(decodeURIComponent).join("/");
+  const itemResp = await fetch(`${G}/drives/${drive.id}/root:/${folderPath}`, { headers: h });
+  if (!itemResp.ok) throw new Error("Cannot find folder '" + folderPath + "' (" + itemResp.status + ").");
+  const item = await itemResp.json();
+  return { driveId: drive.id, itemId: item.id };
+}
+
+// Enumerate all images recursively within a drive item folder
+async function collectImages(token, driveId, rootItemId, onProgress) {
+  const h = { Authorization: "Bearer " + token, Accept: "application/json" };
+  const G = "https://graph.microsoft.com/v1.0";
+  const IMG = /\.(jpe?g|png|gif|webp|heic|heif|tiff?|bmp)$/i;
+
+  const result = [];
+  const queue = [{ itemId: rootItemId, prefix: "" }];
+
+  while (queue.length > 0) {
+    const { itemId, prefix } = queue.shift();
+    let url = `${G}/drives/${driveId}/items/${itemId}/children?$expand=thumbnails&$top=200&$select=id,name,file,folder,parentReference`;
+
+    while (url) {
+      const resp = await fetch(url, { headers: h });
+      if (!resp.ok) throw new Error("Graph API error (" + resp.status + ") listing folder contents.");
+      const data = await resp.json();
+
+      for (const item of (data.value || [])) {
+        if (item.folder) {
+          const childPrefix = prefix ? prefix + "/" + item.name : item.name;
+          queue.push({ itemId: item.id, prefix: childPrefix });
+        } else if (item.file && IMG.test(item.name)) {
+          const key = prefix ? prefix + "/" + item.name : item.name;
+          const thumb =
+            item.thumbnails?.[0]?.medium?.url ||
+            item.thumbnails?.[0]?.large?.url ||
+            item.thumbnails?.[0]?.small?.url ||
+            null;
+          result.push({ key, thumb: thumb || placeholderThumb(item.name), folder: prefix });
+          if (onProgress) onProgress(result.length);
+        }
+      }
+
+      url = data["@odata.nextLink"] || null;
+    }
+  }
+
+  return result;
+}
+
+// ── Main SharePoint connect flow ──────────────────────────
+async function connectSharePoint(folderUrl, clientId, tenantId) {
+  if (!folderUrl) { setSpStatus("Enter a SharePoint folder URL.", "error"); return; }
+  if (!clientId || !tenantId) {
+    setSpStatus("Enter your Azure AD Client ID and Tenant ID.", "error");
+    document.getElementById("creds-toggle").click();
+    return;
+  }
+
+  saveSpConfig(clientId, tenantId);
+  setSpStatus("Initialising…");
+
+  let msalInstance;
+  try {
+    msalInstance = await createMsalInstance(clientId, tenantId);
+  } catch(e) {
+    setSpStatus("MSAL init failed: " + e.message, "error");
+    return;
+  }
+
+  let token = await getAccessToken(msalInstance);
+
+  if (!token) {
+    // Save intent and redirect to login
+    localStorage.setItem(SP_PENDING_KEY, JSON.stringify({ folderUrl, cats: parseCatInput() }));
+    setSpStatus("Redirecting to Microsoft login…");
+    try {
+      await msalInstance.loginRedirect({
+        scopes: ["https://graph.microsoft.com/Files.Read.All", "https://graph.microsoft.com/User.Read"],
+        prompt: "select_account",
+      });
+    } catch(e) {
+      setSpStatus("Login redirect failed: " + e.message, "error");
+    }
+    return;
+  }
+
+  await fetchAndStartSorter(token, folderUrl, parseCatInput());
+}
+
+async function fetchAndStartSorter(token, folderUrl, catNames) {
+  setLoading(true, "Connecting to SharePoint…");
+  try {
+    const { driveId, itemId } = await resolveSpFolder(token, folderUrl);
+    setLoading(true, "Scanning for photos…", "This may take a moment for large folders.");
+
+    let count = 0;
+    const imgList = await collectImages(token, driveId, itemId, n => {
+      count = n;
+      document.getElementById("loading-detail").textContent = `Found ${n} photo${n !== 1 ? "s" : ""} so far…`;
+    });
+
+    if (imgList.length === 0) {
+      setLoading(false);
+      setSpStatus("No supported images found in that folder.", "error");
+      return;
+    }
+
+    const m = {
+      source: "sharepoint:" + folderUrl,
+      categories: catNames.length ? catNames : ["Common", "Groom side", "Bride side"],
+      images: imgList,
+    };
+
+    setLoading(false);
+    startFromManifest(m);
+  } catch(e) {
+    setLoading(false);
+    setSpStatus(e.message, "error");
+  }
+}
+
+// ── Handle MSAL redirect on page load ─────────────────────
+// Must call handleRedirectPromise() unconditionally on every page load to drain
+// the auth response from the URL hash — even if no pending key exists.
+async function handleMsalRedirectOnLoad() {
+  const cfg = loadSpConfig();
+  if (!cfg.clientId || !cfg.tenantId) return;
+
+  let msalInstance;
+  try {
+    msalInstance = await createMsalInstance(cfg.clientId, cfg.tenantId);
+  } catch { return; }
+
+  let result;
+  try {
+    result = await msalInstance.handleRedirectPromise();
+  } catch(e) {
+    localStorage.removeItem(SP_PENDING_KEY);
+    setSpStatus("Login failed: " + e.message, "error");
+    return;
+  }
+
+  if (!result) return; // Not a redirect callback
+
+  const pendingRaw = localStorage.getItem(SP_PENDING_KEY);
+  localStorage.removeItem(SP_PENDING_KEY);
+
+  if (!pendingRaw) return; // Signed in but no intent saved — nothing to load
+
+  const { folderUrl, cats: savedCats } = JSON.parse(pendingRaw);
+  const token = result.accessToken;
+
+  // Restore the URL inputs
+  document.getElementById("sp-url-input").value = folderUrl;
+  if (savedCats) document.getElementById("cat-input").value = savedCats.join(",");
+
+  setSpStatus("Signed in as " + (result.account?.name || result.account?.username || "Microsoft account") + " ✓", "ok");
+  await fetchAndStartSorter(token, folderUrl, savedCats || parseCatInput());
+}
+
+// ══════════════════════════════════════════════════════════
 // Boot
 // ══════════════════════════════════════════════════════════
-(function boot() {
+(async function boot() {
+  // Populate redirect URI hint (template literals don't evaluate in static HTML)
+  document.getElementById("redirect-uri-hint").textContent = location.origin + location.pathname;
+
+  // Restore saved SP credentials into fields
+  const cfg = loadSpConfig();
+  if (cfg.clientId) document.getElementById("sp-client-id").value = cfg.clientId;
+  if (cfg.tenantId) document.getElementById("sp-tenant-id").value = cfg.tenantId;
+
+  // Show resume button if there's a saved session
   const session = loadSession();
   if (session?.decisions && Object.keys(session.decisions).length > 0) {
     document.getElementById("resume-btn").style.display = "";
@@ -280,13 +726,16 @@ function clearSession() {
       `Resume (${Object.keys(session.decisions).length} decisions saved)`;
   }
 
-  // If served alongside manifest.json, auto-fetch
+  // Auto-fetch manifest.json if served alongside it
   if (location.protocol !== "file:") {
     fetch("manifest.json")
       .then(r => r.ok ? r.json() : null)
       .then(m => { if (m) startFromManifest(m); })
       .catch(() => {});
   }
+
+  // Handle MSAL redirect return (must run even if no pending key, to drain state)
+  await handleMsalRedirectOnLoad();
 })();
 
 // ══════════════════════════════════════════════════════════
@@ -312,10 +761,8 @@ document.getElementById("load-manifest-btn").addEventListener("click", () => {
 });
 
 document.getElementById("resume-btn").addEventListener("click", () => {
-  // Re-fetch manifest or prompt
   const session = loadSession();
   if (!session) return;
-  // Try auto-fetch first
   if (location.protocol !== "file:") {
     fetch("manifest.json")
       .then(r => r.ok ? r.json() : null)
@@ -327,6 +774,22 @@ document.getElementById("resume-btn").addEventListener("click", () => {
   } else {
     document.getElementById("load-manifest-btn").click();
   }
+});
+
+// SharePoint sign-in button
+document.getElementById("sp-signin-btn").addEventListener("click", () => {
+  const folderUrl = document.getElementById("sp-url-input").value.trim();
+  const clientId  = document.getElementById("sp-client-id").value.trim();
+  const tenantId  = document.getElementById("sp-tenant-id").value.trim();
+  document.getElementById("sp-signin-btn").disabled = true;
+  connectSharePoint(folderUrl, clientId, tenantId)
+    .finally(() => { document.getElementById("sp-signin-btn").disabled = false; });
+});
+
+// Collapsible credentials section
+document.getElementById("creds-toggle").addEventListener("click", function() {
+  this.classList.toggle("open");
+  document.getElementById("creds-body").classList.toggle("open");
 });
 
 function startFromManifest(m, resumeSession) {
@@ -373,10 +836,10 @@ function buildButtons() {
     btn.textContent = cat;
     const hint = document.createElement("span");
     hint.className = "key-hint";
-    hint.textContent = `[${i + 1}]`;
+    hint.textContent = "[" + (i + 1) + "]";
     btn.appendChild(hint);
     btn.addEventListener("click", () => decide(cat));
-    btn.addEventListener("touchstart", () => {}, { passive: true }); // prevent delay
+    btn.addEventListener("touchstart", () => {}, { passive: true });
     row.appendChild(btn);
   });
 }
@@ -385,19 +848,14 @@ function showCurrent() {
   if (!images.length) return;
   const img = images[index];
 
-  // Progress
   const decided = Object.keys(decisions).length;
-  document.getElementById("progress-lbl").textContent = `${decided}/${images.length}`;
-
-  // Filename
+  document.getElementById("progress-lbl").textContent = decided + "/" + images.length;
   document.getElementById("filename-lbl").textContent = img.key;
 
-  // Photo — resolve relative path if served from same origin
   const photo = document.getElementById("photo");
   photo.src = img.thumb;
   photo.alt = img.key;
 
-  // Show swipe hint for ≤3 categories (first 3 loads only)
   if (cats.length <= 3) {
     const hint = document.getElementById("swipe-hint");
     hint.textContent = "← swipe right → or tap buttons";
@@ -412,25 +870,18 @@ function decide(category) {
   decisions[img.key] = category;
   saveSession();
 
-  // Flash
   const flash = document.getElementById("decision-flash");
   flash.textContent = category === "rejected" ? "✗  Rejected" : "✓  " + category;
   flash.className = "show" + (category === "rejected" ? " reject" : "");
   clearTimeout(flash._timer);
   flash._timer = setTimeout(() => flash.className = "", 600);
 
-  // Check all decided
   const decided = Object.keys(decisions).length;
-  if (decided >= images.length) {
-    showDoneScreen();
-    return;
-  }
+  if (decided >= images.length) { showDoneScreen(); return; }
 
-  // Advance to next undecided
   let next = index + 1;
   while (next < images.length && decisions[images[next].key]) next++;
   if (next >= images.length) {
-    // Wrap — find any undecided
     next = images.findIndex(img => !decisions[img.key]);
     if (next < 0) { showDoneScreen(); return; }
   }
@@ -478,8 +929,8 @@ document.addEventListener("keydown", e => {
     const dt = Date.now() - startTime;
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7 || dt > 600) return;
 
-    if (dx < 0 && cats.length >= 1) decide(cats[0]);       // swipe left → cat 1
-    else if (dx > 0 && cats.length >= 2) decide(cats[1]);  // swipe right → cat 2
+    if (dx < 0 && cats.length >= 1) decide(cats[0]);
+    else if (dx > 0 && cats.length >= 2) decide(cats[1]);
   }, { passive: true });
 })();
 
@@ -487,7 +938,6 @@ document.addEventListener("keydown", e => {
 // Export helpers
 // ══════════════════════════════════════════════════════════
 function buildRows() {
-  // Group by folder
   const byFolder = {};
   for (const img of images) {
     const cat = decisions[img.key];
@@ -496,7 +946,6 @@ function buildRows() {
     if (!byFolder[folder]) byFolder[folder] = [];
     byFolder[folder].push({ filename: img.key, folder, category: cat });
   }
-  // Flatten in folder order
   const rows = [];
   const folders = Object.keys(byFolder).sort();
   for (const f of folders) rows.push(...byFolder[f]);
@@ -506,7 +955,7 @@ function buildRows() {
 function downloadCSV() {
   const rows = buildRows();
   const header = "filename,folder,category\n";
-  const body = rows.map(r => `${csvEsc(r.filename)},${csvEsc(r.folder)},${csvEsc(r.category)}`).join("\n");
+  const body = rows.map(r => csvEsc(r.filename) + "," + csvEsc(r.folder) + "," + csvEsc(r.category)).join("\n");
   download("photo_sort_results.csv", "text/csv", header + body);
 }
 
@@ -516,7 +965,7 @@ function downloadJSON() {
 }
 
 function csvEsc(v) {
-  if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
   return v;
 }
 
@@ -535,7 +984,7 @@ function showDoneScreen() {
   document.getElementById("app").style.display = "none";
   document.getElementById("done-screen").style.display = "flex";
   document.getElementById("done-msg").textContent =
-    `All ${images.length} photos sorted! Download your results:`;
+    "All " + images.length + " photos sorted! Download your results:";
 }
 
 document.getElementById("done-export-csv").addEventListener("click", downloadCSV);
