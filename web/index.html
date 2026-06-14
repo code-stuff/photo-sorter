@@ -354,7 +354,7 @@ html, body {
         <input type="text" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
       </div>
       <p style="font-size:11px; color:#555; line-height:1.5;">
-        Register a SPA app in Azure Portal → Microsoft Entra ID. Add redirect URI: <code style="color:#888">${location.origin + location.pathname}</code>. Grant <code style="color:#888">Files.Read.All</code> permission. IDs are not secrets.
+        Register a SPA app in Azure Portal → Microsoft Entra ID. Add redirect URI: <code id="redirect-uri-hint" style="color:#888"></code>. Grant <code style="color:#888">Files.Read.All</code> permission. IDs are not secrets.
       </p>
     </div>
 
@@ -499,7 +499,7 @@ async function resolveSpFolder(token, folderUrl) {
 
   // Share link (contains /:f:/ or /r/ shortlinks)
   if (/\/:f:\//i.test(folderUrl) || /\/r\//i.test(folderUrl)) {
-    const b64 = btoa(folderUrl).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const b64 = btoa(unescape(encodeURIComponent(folderUrl))).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
     const shareId = "u!" + b64;
     const resp = await fetch(`${G}/shares/${shareId}/driveItem`, { headers: h });
     if (!resp.ok) throw new Error("Cannot resolve share link (" + resp.status + "). Make sure it is an 'Anyone with the link' share.");
@@ -668,11 +668,9 @@ async function fetchAndStartSorter(token, folderUrl, catNames) {
 }
 
 // ── Handle MSAL redirect on page load ─────────────────────
+// Must call handleRedirectPromise() unconditionally on every page load to drain
+// the auth response from the URL hash — even if no pending key exists.
 async function handleMsalRedirectOnLoad() {
-  const pending = localStorage.getItem(SP_PENDING_KEY);
-  if (!pending) return;
-
-  const { folderUrl, cats: savedCats } = JSON.parse(pending);
   const cfg = loadSpConfig();
   if (!cfg.clientId || !cfg.tenantId) return;
 
@@ -692,7 +690,12 @@ async function handleMsalRedirectOnLoad() {
 
   if (!result) return; // Not a redirect callback
 
+  const pendingRaw = localStorage.getItem(SP_PENDING_KEY);
   localStorage.removeItem(SP_PENDING_KEY);
+
+  if (!pendingRaw) return; // Signed in but no intent saved — nothing to load
+
+  const { folderUrl, cats: savedCats } = JSON.parse(pendingRaw);
   const token = result.accessToken;
 
   // Restore the URL inputs
@@ -707,6 +710,9 @@ async function handleMsalRedirectOnLoad() {
 // Boot
 // ══════════════════════════════════════════════════════════
 (async function boot() {
+  // Populate redirect URI hint (template literals don't evaluate in static HTML)
+  document.getElementById("redirect-uri-hint").textContent = location.origin + location.pathname;
+
   // Restore saved SP credentials into fields
   const cfg = loadSpConfig();
   if (cfg.clientId) document.getElementById("sp-client-id").value = cfg.clientId;
